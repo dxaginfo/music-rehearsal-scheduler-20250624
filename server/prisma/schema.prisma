@@ -1,0 +1,141 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String           @id @default(uuid())
+  email           String           @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  phone           String?
+  timezone        String           @default("UTC")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  ownedGroups     Group[]          @relation("GroupOwner")
+  memberships     GroupMember[]
+  rehearsalOwner  Rehearsal[]      @relation("RehearsalOwner")
+  attendances     Attendance[]
+  venuesCreated   Venue[]          @relation("VenueCreator")
+  availabilities  Availability[]
+}
+
+model Group {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User          @relation("GroupOwner", fields: [ownerId], references: [id])
+  members     GroupMember[]
+  rehearsals  Rehearsal[]
+  songs       Song[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model GroupMember {
+  id         String   @id @default(uuid())
+  groupId    String
+  group      Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       String   @default("member") // admin, member
+  instrument String?
+  joinDate   DateTime @default(now())
+
+  @@unique([groupId, userId])
+}
+
+model Venue {
+  id          String      @id @default(uuid())
+  name        String
+  address     String?
+  contactInfo String?
+  notes       String?
+  createdById String
+  createdBy   User        @relation("VenueCreator", fields: [createdById], references: [id])
+  rehearsals  Rehearsal[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Rehearsal {
+  id                String           @id @default(uuid())
+  groupId           String
+  group             Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  venueId           String?
+  venue             Venue?           @relation(fields: [venueId], references: [id])
+  title             String
+  startTime         DateTime
+  endTime           DateTime
+  recurringPattern  Json?
+  description       String?
+  createdById       String
+  createdBy         User             @relation("RehearsalOwner", fields: [createdById], references: [id])
+  attendances       Attendance[]
+  rehearsalSongs    RehearsalSong[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model Attendance {
+  id           String    @id @default(uuid())
+  rehearsalId  String
+  rehearsal    Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       String    @default("no_response") // confirmed, declined, tentative, no_response
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([rehearsalId, userId])
+}
+
+model Availability {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek    Int?      // 0-6 (Sunday-Saturday)
+  startTime    DateTime
+  endTime      DateTime
+  recurring    Boolean   @default(true)
+  specificDate DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Song {
+  id             String          @id @default(uuid())
+  groupId        String
+  group          Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  title          String
+  artist         String?
+  notes          String?
+  sheetMusicUrl  String?
+  recordingUrl   String?
+  rehearsalSongs RehearsalSong[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model RehearsalSong {
+  id              String    @id @default(uuid())
+  rehearsalId     String
+  rehearsal       Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  songId          String
+  song            Song      @relation(fields: [songId], references: [id], onDelete: Cascade)
+  position        Int
+  durationMinutes Int?
+  notes           String?
+
+  @@unique([rehearsalId, songId])
+}
